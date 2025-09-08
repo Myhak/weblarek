@@ -20,7 +20,7 @@
 
 ```
 npm install
-npm run start
+npm run dev
 ```
 
 или
@@ -98,3 +98,205 @@ Presenter - презентер содержит основную логику п
 `emit<T extends object>(event: string, data?: T): void` - инициализация события. При вызове события в метод передается название события и объект с данными, который будет использован как аргумент для вызова обработчика.  
 `trigger<T extends object>(event: string, context?: Partial<T>): (data: T) => void` - возвращает функцию, при вызове которой инициализируется требуемое в параметрах событие с передачей в него данных из второго параметра.
 
+### Данные
+В приложении используются следующие структуры данных:
+
+IProduct — товар
+interface IProduct {
+  id: string;
+  description: string;
+  image: string;
+  title: string;
+  category: string;
+  price: number | null;
+}
+Назначение: описывает один товар в каталоге. Используется для отображения карточек, детального просмотра и добавления в корзину.
+
+IBuyer — данные покупателя
+type TPayment = 'card' | 'cash';
+
+interface IBuyer {
+  payment: TPayment;
+  email: string;
+  phone: string;
+  address: string;
+}
+Назначение: хранит контактные данные и способ оплаты при оформлении заказа.
+
+IOrder — заказ, отправляемый на сервер
+interface IOrder {
+  items: string[]; // массив ID товаров
+  payment: TPayment;
+  address: string;
+  email: string;
+  phone: string;
+}
+Назначение: структура данных, которая отправляется на сервер при оформлении заказа.
+
+### Модели данных
+Модели данных отвечают за хранение и управление состоянием приложения. Они не зависят от представления или API.
+
+Products — каталог товаров
+Назначение: хранит список всех товаров и выбранный для просмотра товар.
+
+Конструктор:
+constructor() — не принимает параметров.
+
+Поля:
+items: IProduct[] — массив всех товаров.
+selectedItem: IProduct | null — товар, выбранный для детального просмотра.
+
+Методы:
+setItems(items: IProduct[]): void — сохраняет массив товаров.
+getItems(): IProduct[] — возвращает все товары.
+getItemById(id: string): IProduct | undefined — возвращает товар по ID.
+setSelectedItem(item: IProduct): void — устанавливает выбранный товар.
+getSelectedItem(): IProduct | null — возвращает выбранный товар.
+
+Basket — корзина покупок
+Назначение: хранит товары, добавленные пользователем, и рассчитывает общую стоимость.
+
+Конструктор:
+constructor()
+
+Поля:
+items: IProduct[] — товары в корзине.
+
+Методы:
+getItems(): IProduct[] — возвращает товары в корзине.
+addItem(item: IProduct): void — добавляет товар в корзину.
+removeItem(id: string): void — удаляет товар по ID.
+clear(): void — очищает корзину.
+getTotal(): number — возвращает общую стоимость.
+getCount(): number — возвращает количество товаров.
+hasItem(id: string): boolean — проверяет, есть ли товар в корзине.
+
+Buyer — данные покупателя
+Назначение: хранит и валидирует данные покупателя при оформлении заказа.
+
+Конструктор:
+constructor()
+
+Поля:
+payment: TPayment | null
+address: string
+email: string
+phone: string
+
+Методы:
+setPayment(payment: TPayment): void
+setAddress(address: string): void
+setEmail(email: string): void
+setPhone(phone: string): void
+getData(): IBuyer — возвращает все данные (если заполнены).
+clear(): void — сбрасывает все поля.
+validate(): string[] — возвращает массив ошибок валидации (пустой — если всё ок).
+
+### Слой коммуникации
+LarekAPI
+Назначение: обеспечивает связь с сервером, используя композицию с классом Api. Получает каталог товаров и отправляет заказы.
+
+Конструктор:
+constructor(api: IApi) — принимает экземпляр Api (уже реализован в базовом коде).
+
+Методы:
+getProducts(): Promise<IProduct[]> — делает GET-запрос к /product и возвращает массив товаров.
+postOrder(order: IOrder): Promise<{ id: string, total: number }> — отправляет заказ на /order.
+
+## Слой представления (View)
+Компоненты отвечают только за отображение. Не хранят данные, не содержат логики. Уведомляют о действиях через события или коллбэки.
+
+Card — базовая карточка товара
+Назначение: абстрактный родитель для всех карточек. Содержит общую логику отображения: изображение, название, категория, цена.
+
+Конструктор:
+constructor(container: HTMLElement, actions?: { onClick?: () => void })
+
+Поля:
+_title: HTMLElement
+_image: HTMLImageElement
+_price: HTMLElement
+_category: HTMLElement
+_description?: HTMLElement
+_button?: HTMLButtonElement
+
+Методы:
+render(): HTMLElement
+Сеттеры: title, image, price, category, description, buttonLabel, buttonDisabled
+
+CatalogItem — карточка в каталоге
+Наследует: Card
+Особенности: клик по всей карточке → событие открытия модалки.
+
+ModalItem — карточка в модалке
+Наследует: Card
+Особенности: показывает описание, кнопка "Купить"/"Удалить".
+
+BasketItem — карточка в корзине
+Наследует: Card
+
+Поля:
+_index: HTMLElement
+_deleteButton: HTMLButtonElement
+Методы: index
+Modal — модальное окно
+
+Методы:
+open()
+close()
+set content(element: HTMLElement)
+isOpened(): boolean
+
+Form — базовая форма
+
+Методы:
+valid, errors
+getValues() — абстрактный
+
+OrderForm — форма оплаты и адреса
+
+Поля:
+_paymentButtons: NodeListOf<HTMLButtonElement>
+_addressInput: HTMLInputElement
+
+Методы: payment, address
+
+ContactsForm — форма контактов
+
+Поля:
+_emailInput: HTMLInputElement
+_phoneInput: HTMLInputElement
+
+Методы: email, phone
+
+Gallery — список карточек
+
+Метод: set items(cards: HTMLElement[])
+
+BasketView — представление корзины
+
+Поля:
+_list: HTMLElement
+_total: HTMLElement
+_button: HTMLButtonElement
+
+Методы: items, total
+
+Success — экран успешной оплаты
+
+Поля:
+_description: HTMLElement
+_closeButton: HTMLButtonElement
+
+Метод: total
+
+## Презентер
+Реализован в main.ts. Связывает Model и View через события.
+
+Основные задачи:
+
+Подписка на события моделей → обновление View
+Подписка на события View → обновление моделей
+Управление модальными окнами
+Оформление заказа и отправка на сервер
+Подход: логика в main.ts, без выноса в отдельный класс
